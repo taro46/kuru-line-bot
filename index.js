@@ -1,10 +1,11 @@
-console.log('LINE_CHANNEL_SECRET:', process.env.LINE_CHANNEL_SECRET);
-
 const express = require('express');
 const line = require('@line/bot-sdk');
+const fs = require('fs');
+const csv = require('csv-parser');
 require('dotenv').config();
 
-const app = express(); // ← express.json() は不要！
+const app = express();
+app.use(express.json());
 
 const config = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
@@ -12,10 +13,16 @@ const config = {
 };
 const client = new line.Client(config);
 
-const { OpenAI } = require('openai');
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// CSVから飲食店情報を読み込み（ファイル名修正済み）
+let restaurants = [];
+fs.createReadStream('oimachi_restaurants.csv')
+  .pipe(csv())
+  .on('data', (row) => {
+    restaurants.push(row);
+  })
+  .on('end', () => {
+    console.log('CSV読み込み完了！');
+  });
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
   const events = req.body.events;
@@ -24,25 +31,25 @@ app.post('/webhook', line.middleware(config), async (req, res) => {
   await Promise.all(events.map(async (event) => {
     if (event.type !== 'message' || event.message.type !== 'text') return;
 
-    try {
-      const response = await openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
-        messages: [{ role: 'user', content: event.message.text }],
-      });
+    const userText = event.message.text.trim();
+    const matched = restaurants.find(r => userText.includes(r["店名"]));
 
-      const replyText = response.choices[0].message.content;
-
-      await client.replyMessage(event.replyToken, {
-        type: 'text',
-        text: replyText,
-      });
-    } catch (error) {
-      console.error('ChatGPT error:', error);
-      await client.replyMessage(event.replyToken, {
-        type: 'text',
-        text: 'エラーが発生しました。',
-      });
+    let replyText = "そのお店の情報はありません。勉強しておきます。";
+    if (matched) {
+      replyText =
+        `【${matched["店名"]}】\n` +
+        `ジャンル：${matched["ジャンル"]}\n` +
+        `住所：${matched["住所"]}\n` +
+        `電話：${matched["電話番号"]}\n` +
+        `営業時間：${matched["営業時間"]}\n` +
+        `定休日：${matched["定休日"]}\n` +
+        `Webサイト：${matched["Web URL"]}`;
     }
+
+    await client.replyMessage(event.replyToken, {
+      type: 'text',
+      text: replyText,
+    });
   }));
 
   res.status(200).end();
