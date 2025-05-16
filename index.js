@@ -5,15 +5,15 @@ const csv = require('csv-parser');
 require('dotenv').config();
 
 const app = express();
-app.use(express.json());
 
+// ✅ express.json() をここでは使わない（削除または後ろに）
 const config = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
   channelSecret: process.env.LINE_CHANNEL_SECRET,
 };
 const client = new line.Client(config);
 
-// CSVから飲食店情報を読み込み（ファイル名修正済み）
+// CSVから飲食店情報を読み込み
 let restaurants = [];
 fs.createReadStream('oimachi_restaurants.csv')
   .pipe(csv())
@@ -24,6 +24,7 @@ fs.createReadStream('oimachi_restaurants.csv')
     console.log('CSV読み込み完了！');
   });
 
+// ✅ LINE middleware を先に通す！
 app.post('/webhook', line.middleware(config), async (req, res) => {
   const events = req.body.events;
   if (!events.length) return res.status(200).end();
