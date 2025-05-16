@@ -4,8 +4,7 @@ const express = require('express');
 const line = require('@line/bot-sdk');
 require('dotenv').config();
 
-const app = express();
-app.use(express.json());
+const app = express(); // ← express.json() は不要！
 
 const config = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
